@@ -1,0 +1,19 @@
+{
+  "name": "nightshifts-skyblock",
+  "version": "1.0.0",
+  "description": "",
+  "license": "ISC",
+  "author": "wryjonue",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "better-sqlite3": "^12.4.1",
+    "discord.js": "^14.22.1",
+    "express": "^5.1.0",
+    "sql-template-strings": "^2.2.2",
+    "dotenv": "17.2.3"
+  }
+}
