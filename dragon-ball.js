@@ -1,12 +1,19 @@
 import sqlite from "better-sqlite3";
 import sql from "sql-template-strings";
 
-const db = new sqlite.Database('dragonballs.db');
+export const db = new sqlite.Database('dragonballs.db');
 db.pragma("foreign_keys = ON");
 db.exec(sql`
+	CREATE TABLE IF NOT EXISTS global_params (
+		id INTEGER PRIMARY KEY CHECK (id = 1),
+		spiral_x INTEGER DEFAULT 0,
+		spiral_z INTEGER DEFAULT 0,
+		spiral_increment INTEGER DEFAULT 0,
+		spiral_steps INTEGER DEFAULT 0,
+		spiral_direction INTEGER DEfAULT 0
+	);
 	CREATE TABLE IF NOT EXISTS players (
-		id INTEGER PRIMARY KEY,
-		username TEXT NOT NULL,
+		id TEXT PRIMARY KEY,
 		xuid TEXT NOT NULL,
 		created_at INTEGER DEFAULT (strftime('%s','now')),
 		display_name TEXT NOT NULL,
@@ -19,7 +26,7 @@ db.exec(sql`
 	);
 	CREATE TABLE IF NOT EXISTS skyblocks (
 		id INTEGER PRIMARY KEY,
-		owner_id INTEGER NOT NULL, 
+		owner_id TEXT NOT NULL, 
 		grid_id INTEGER NOT NULL,
 		upgrade_level INTEGER DEFAULT 1,
 		spawn_x INTEGER DEFAULT 0
@@ -33,7 +40,7 @@ db.exec(sql`
 	);
 	-- F*cking SQL don't support hierarchical data.
 	CREATE TABLE IF NOT EXISTS skyblock_perms (
-		player_id INTEGER,
+		player_id TEXT,
 		grid_id INTEGER,
 		break_perm INTEGER DEFAULT 1,
 		place_perm INTEGER DEFAULT 1,
@@ -46,11 +53,11 @@ db.exec(sql`
 	);
 `);
 
-export function createPlayer(id, username, xuid, displayName) {
+export function createPlayer(id, xuid, displayName) {
 	try {
 		db.prepare(sql`
-			INSERT INTO players (id, username, xuid, display_name)
-			VALUES (${id}, ${username}, ${xuid}, ${displayName})
+			INSERT INTO players (id, xuid, display_name)
+			VALUES (${id}, ${xuid}, ${displayName})
 		`).run();
 	} catch (err) {
 		console.error("Failed to create player: ", err.message);

@@ -6,7 +6,7 @@ import express from 'express';
 import { Client, GatewayIntentBits, Events } from 'discord.js';
 import dotenv from "dotenv";
 import sql from "sql-template-strings";
-import * as db from "./dragon-ball.js";
+import { db, createPlayer, createSkyblock } from "./dragon-ball.js";
 
 dotenv.config();
 
@@ -18,42 +18,66 @@ const app = express();
 const PORT = process.env.PORT;
 
 app.use(express.json());
- 
-app.get('/player-login', (req, res) => {
-	let data = JSON.parse(req.body);
-	// Gets skyblock permissions
-	let row = db.rawAll(sql`
+function authMiddleware(req, res, next) {
+	const auth = req.headers['Authorization'];
+	if (!auth) { return res.status(401).json({ error: 'Missing Authorization header' }) }
+	const token = auth.replace('Bearer ', '');
+	if (token !== process.env.MIDDLEWARE_TOKEN) {
+		return res.status(403).json({ error: 'Invalid Authorization token' });
+	}
+	next();
+}
+app.use(authMiddleware);
+
+app.get('/player/login', (req, res) => {
+	const data = req.body;
+	const perms = db.prepare(sql`
 		SELECT * FROM skyblock_perms
 		WHERE player_id = ${data.player_id}
-	`);
-	res.json({perms: row})
+	`).all();
+	const creds = db.prepare(sql`
+		SELECT credits FROM players
+		WHERE player_id = ${data.player_id}
+	`).get(); 
+	res.json({perms, ...creds});
 });
-app.get('/credit-save', (req, res) => {
-	let data = JSON.parse(req.body);
-	db.rawRun(sql`
+
+app.post('/credit/save', (req, res) => {
+	let data = req.body;
+	db.prepare(sql`
 		UPDATE players
 		SET credits = ${data.credits}
 		WHERE player_id = ${data.player_id}
-	`);
+	`).run();
 });
-app.get('/credit-saveall', (req, res) => {
-	let data = JSON.parse(req.body);
-	db.rawRun(sql`
+
+app.post('/credit/saveall', (req, res) => {
+	let data = req.body;
+	const cases = data.credmap.map(e => `WHEN ${e.id} THEN ${e.credits}`).join(" ");
+	const ids = data.credmap.map(e => e.id).join(", ");
+	db.prepare(sql`
 		UPDATE players
-		SET credits = ${data.credits}
-		WHERE player_id = ${data.player_id}
-	`);
+		SET credits = CASE id
+			${cases}
+		END
+		WHERE id IN (${ids})
+	`).run();
 });
 
-app.get('/new-player', (req, res) => {
-	let data = JSON.parse(req.body);
+app.post('/player/new', (req, res) => {
+	let data = req.body;
+	createPlayer(data.player_id, data.xuid, data.display_name);
 });
 
+app.post('/player/new-skyblock', (req, res) => {
+	let data = req.body;
+	createSkyblock(data.player_id, data.xuid, data.display_name);
+})
 let players = [];
 let playerAvatars = [];
 let xuids = [];
 app.get('/players', (req, res) => {
-	req.body();
+	req.body;
 	res.json({ players });
 });
 
