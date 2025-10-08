@@ -20,11 +20,10 @@ db.exec(sql`
 	CREATE TABLE IF NOT EXISTS skyblocks (
 		id INTEGER PRIMARY KEY,
 		owner_id INTEGER NOT NULL, 
-		grid_x INTEGER NOT NULL,
-		grid_z INTEGER NOT NULL,
+		grid_id INTEGER NOT NULL,
 		upgrade_level INTEGER DEFAULT 1,
 		spawn_x INTEGER DEFAULT 0
-			-- Fanciness. Will still do server-side validations.
+			-- For fanciness. Will still do server-side validations.
 			CHECK(spawn_x >= (-10 * upgrade_level) AND spawn_x <= (10 * upgrade_level)),
 		spawn_z INTEGER DEFAULT 0
 			CHECK(spawn_z >= (-10 * upgrade_level) AND spawn_z <= (10 * upgrade_level)),
@@ -34,15 +33,15 @@ db.exec(sql`
 	);
 	-- F*cking SQL don't support hierarchical data.
 	CREATE TABLE IF NOT EXISTS skyblock_perms (
-		skyblock_id INTEGER,
 		player_id INTEGER,
+		grid_id INTEGER,
 		break_perm INTEGER DEFAULT 1,
 		place_perm INTEGER DEFAULT 1,
 		chest_perm INTEGER DEFAULT 1,
 		doors_perm INTEGER DEFAULT 1,
 		other_perm INTEGER DEFAULT 1, -- All interact events except chests and doors
-		PRIMARY KEY(skyblock_id, player_id),
-		FOREIGN KEY(skyblock_id) REFERENCES skyblocks(id),
+		PRIMARY KEY(player_id, grid_id),
+		FOREIGN KEY(grid_id) REFERENCES skyblocks(grid_id) ON UPDATE CASCADE,
 		FOREIGN KEY(player_id) REFERENCES players(id)
 	);
 `);
