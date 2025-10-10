@@ -9,9 +9,9 @@ db.pragma('journal_mode = WAL');
 db.execute(sql`
 	CREATE TABLE IF NOT EXISTS global_params (
 		id INTEGER PRIMARY KEY CHECK (id = 1),
-		spiral_x INTEGER DEFAULT 1,
+		spiral_x INTEGER DEFAULT 2,
 		spiral_z INTEGER DEFAULT -1,
-		spiral_inc INTEGER DEFAULT 2,
+		spiral_inc INTEGER DEFAULT 3,
 		spiral_step INTEGER DEFAULT 3,
 		spiral_dir INTEGER DEfAULT 0
 	);
@@ -76,7 +76,6 @@ export function createSkyblock(ownerId, gridId) {
 			INSERT INTO skyblocks (owner_id, grid_id)
 			VALUES (${ownerId}, ${gridId})
 		`);
-
 		// Inserts the skyblock into the player data.
 		const skyblockId = info.lastInsertRowid;
 		db.run(sql`
@@ -84,10 +83,10 @@ export function createSkyblock(ownerId, gridId) {
 			SET skyblock_id = ${skyblockId}
 			WHERE id = ${ownerId}
 		`);
-		return skyblockId;
+		return true;
 	} catch (err) {
 		console.error("Failed to create skyblock: ", err.message);
-		throw err;
+		return false;
 	}
 }
 

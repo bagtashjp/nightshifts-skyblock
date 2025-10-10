@@ -35,7 +35,7 @@ app.post('/player/perms', ({ body }, res) => {
 		JOIN skyblocks sb ON sp.grid_id = sb.grid_id
 		WHERE sp.player_id = ${body.player_id}
 	`);
-	parsedPerm = {};
+	let parsedPerm = {};
 	perms.forEach(e => {
 		parsedPerm[e.grid_id] = {
 			upgrade_level: e.upgrade_level,
@@ -81,29 +81,33 @@ app.post('/player/new', ({body}, res) => {
 	}
 });
 
-app.post('/player/new-skyblock', ({body}, res) => {
+app.post('/skyblock/new', ({body}, res) => {
 	console.log(`Creating Skyblock for player id: [${body.player_id}].`);
-	createSkyblock(body.player_id, body.grid_id);
+	let isSuccess = createSkyblock(body.player_id, body.grid_id);
+	if (isSuccess) res.sendStatus(200);
+	else res.sendStatus(500);
 });
-
 
 app.post('/skyblock/retrieve', ({body}, res) => {
 	let data = db.get(sql`
 		SELECT * FROM skyblocks
-		WHERE player_id = ${body.player_id}
+		WHERE owner_id = ${body.player_id}
 	`);
 	data.perms = db.all(sql`
 		SELECT * FROM skyblock_perms
 		WHERE grid_id = ${data.grid_id}
 	`)
 	res.json(data);
-})
+});
+
+
 app.get('/players', (req, res) => {
+	console.log("Retrieving player list from the database.");
 	const data = db.all(sql`
-		SELECT id FROM players
+		SELECT id, display_name
+		FROM players
 	`);
-	console.log("Passer");
-	res.json(data.map(e => e.id));
+	res.json(data);
 });
 
 app.get('/globals', (req, res) => {
@@ -112,6 +116,19 @@ app.get('/globals', (req, res) => {
 		WHERE id = 1
 	`);
 	res.json(data);
+});
+
+app.post('/globals/spiral', ({body : spiral}, res) => {
+	let changes = db.run(sql`
+		UPDATE global_params
+		SET spiral_x = ${spiral.x},
+			spiral_z = ${spiral.z},
+			spiral_inc = ${spiral.inc},
+			spiral_step = ${spiral.step},
+			spiral_dir = ${spiral.dir}
+		WHERE id = 1
+	`).changes;
+	console.log("Spiral Updated Succes Code: ", changes);
 });
 
 app.listen(PORT, () => {
