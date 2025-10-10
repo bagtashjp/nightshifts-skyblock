@@ -1,16 +1,19 @@
-import sqlite from "better-sqlite3";
-import sql from "sql-template-strings";
+import sql, {Database} from "@radically-straightforward/sqlite";
+import path from 'path';
 
-export const db = new sqlite.Database('dragonballs.db');
+const dbPath = path.join('worlds', 'n-world', 'dragonballs.db');
+export const db = new Database(dbPath);
+
 db.pragma("foreign_keys = ON");
-db.exec(sql`
+db.pragma('journal_mode = WAL');
+db.execute(sql`
 	CREATE TABLE IF NOT EXISTS global_params (
 		id INTEGER PRIMARY KEY CHECK (id = 1),
-		spiral_x INTEGER DEFAULT 0,
-		spiral_z INTEGER DEFAULT 0,
-		spiral_increment INTEGER DEFAULT 0,
-		spiral_steps INTEGER DEFAULT 0,
-		spiral_direction INTEGER DEfAULT 0
+		spiral_x INTEGER DEFAULT 1,
+		spiral_z INTEGER DEFAULT -1,
+		spiral_inc INTEGER DEFAULT 2,
+		spiral_step INTEGER DEFAULT 3,
+		spiral_dir INTEGER DEfAULT 0
 	);
 	CREATE TABLE IF NOT EXISTS players (
 		id TEXT PRIMARY KEY,
@@ -35,8 +38,7 @@ db.exec(sql`
 		spawn_z INTEGER DEFAULT 0
 			CHECK(spawn_z >= (-10 * upgrade_level) AND spawn_z <= (10 * upgrade_level)),
 		spawn_y INTEGER DEFAULT 100 CHECK(spawn_y >= -64 AND spawn_y <= 319),
-		FOREIGN KEY(owner_id) REFERENCES players(id),
-		UNIQUE(grid_x, grid_z)
+		FOREIGN KEY(owner_id) REFERENCES players(id)
 	);
 	-- F*cking SQL don't support hierarchical data.
 	CREATE TABLE IF NOT EXISTS skyblock_perms (
@@ -48,37 +50,40 @@ db.exec(sql`
 		doors_perm INTEGER DEFAULT 1,
 		other_perm INTEGER DEFAULT 1, -- All interact events except chests and doors
 		PRIMARY KEY(player_id, grid_id),
-		FOREIGN KEY(grid_id) REFERENCES skyblocks(grid_id) ON UPDATE CASCADE,
+		FOREIGN KEY(grid_id) REFERENCES skyblocks(grid_id) ON UPDATE CASCADE
 		FOREIGN KEY(player_id) REFERENCES players(id)
 	);
+	INSERT OR IGNORE INTO global_params(id)
+	VALUES (1);
 `);
 
 export function createPlayer(id, xuid, displayName) {
 	try {
-		db.prepare(sql`
+		db.run(sql`
 			INSERT INTO players (id, xuid, display_name)
 			VALUES (${id}, ${xuid}, ${displayName})
-		`).run();
+		`);
+		return true;
 	} catch (err) {
 		console.error("Failed to create player: ", err.message);
-		throw err;
+		return false;
 	}
 }
 
-export function createSkyblock(ownerId, gridX, gridZ) {
+export function createSkyblock(ownerId, gridId) {
 	try {
-		const info = db.prepare(sql`
-			INSERT INTO skyblocks (owner_id, grid_x, grid_z)
-			VALUES (${ownerId}, ${gridX}, ${gridZ})
-		`).run();
+		const info = db.run(sql`
+			INSERT INTO skyblocks (owner_id, grid_id)
+			VALUES (${ownerId}, ${gridId})
+		`);
 
 		// Inserts the skyblock into the player data.
 		const skyblockId = info.lastInsertRowid;
-		db.prepare(sql`
+		db.run(sql`
 			UPDATE players
 			SET skyblock_id = ${skyblockId}
 			WHERE id = ${ownerId}
-		`).run();
+		`);
 		return skyblockId;
 	} catch (err) {
 		console.error("Failed to create skyblock: ", err.message);
@@ -88,7 +93,7 @@ export function createSkyblock(ownerId, gridX, gridZ) {
 
 export function getPerms(x, z) {
 	try {
-		const info = db.prepare(sql`
+		const info = db.all(sql`
 			SELECT * 
 			FROM skyblock_perms 
 			WHERE skyblock_id = (
@@ -96,7 +101,7 @@ export function getPerms(x, z) {
 				FROM skyblocks 
 				WHERE grid_x = ${x} AND grid_z = ${z}
 			);
-		`).all();
+		`);
 		return info;
 	} catch (err) {
 		console.error("Failed to get skyblock permission list: ", err.message);
@@ -106,10 +111,10 @@ export function getPerms(x, z) {
 
 export function addPerms(skyblockId, playerId) {
 	try {
-		if (db.prepare(sql`
+		if (db.run(sql`
 			INSERT OR IGNORE INTO skyblock_perms (skyblock_id, player_id)
 			VALUES (${skyblockId}, ${playerId})
-		`).run().changes === 0) {
+		`).changes === 0) {
 			throw new Error("Player already exists.");;
 		}
 	} catch (err) {
@@ -120,10 +125,10 @@ export function addPerms(skyblockId, playerId) {
 
 export function deletePerms(skyblockId, playerId) {
 	try {
-		if (db.prepare(sql`
+		if (db.run(sql`
 			DELETE FROM skyblock_perms
 			WHERE skyblock_id = ${skyblockId} AND player_id = ${playerId}
-		`).run().changes === 0) {
+		`).changes === 0) {
 			throw new Error("Player doesn't exist.");
 		} 
 	} catch (err) {
@@ -134,7 +139,7 @@ export function deletePerms(skyblockId, playerId) {
 export function updatePerms(skyblockId, playerId, perms) {
 	try {
 		/* ChatGPT sees this as security issue. IDC I'm a genius */
-		if (db.prepare(sql`UPDATE skyblock_perms `
+		if (db.run(sql`UPDATE skyblock_perms `
 			.append(`
 				SET break_perm = ${perms.break_perm ?? "break_perm"}, 
 					place_perm = ${perms.place_perm ?? "place_perm"},
@@ -142,7 +147,7 @@ export function updatePerms(skyblockId, playerId, perms) {
 					doors_perm = ${perms.doors_perm ?? "doors_perm"},
 					other_perm = ${perms.other_perm ?? "other_perm"}
 			`).append(sql`WHERE skyblock_id = ${skyblockId} AND player_id = ${playerId}`)
-		).run().changes === 0) {
+		).changes === 0) {
 			throw new Error("Player doesn't exist or nothing has changed.");
 		} 
 	} catch (err) {
@@ -152,34 +157,7 @@ export function updatePerms(skyblockId, playerId, perms) {
 }
 export function rawExec(statement) {
 	try {
-		const info = db.exec(statement);
-		return info;
-	} catch (err) {
-		console.error("Run failed: ", err.message);
-		throw err;
-	}
-}
-export function rawRun(statement) {
-	try {
-		const info = db.prepare(statement).run();
-		return info;
-	} catch (err) {
-		console.error("Run failed: ", err.message);
-		throw err;
-	}
-}
-export function rawGet(statement) {
-	try {
-		const info = db.prepare(statement).get();
-		return info;
-	} catch (err) {
-		console.error("Run failed: ", err.message);
-		throw err;
-	}
-}
-export function rawAll(statement) {
-	try {
-		const info = db.prepare(statement).all();
+		const info = db.execute(statement);
 		return info;
 	} catch (err) {
 		console.error("Run failed: ", err.message);
