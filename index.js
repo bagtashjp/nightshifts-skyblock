@@ -28,27 +28,6 @@ function authMiddleware(req, res, next) {
 }
 app.use(authMiddleware);
 
-app.post('/player/perms', ({ body }, res) => {
-	const perms = db.all(sql`
-		SELECT sp.*, sb.upgrade_level
-		FROM skyblock_perms sp
-		JOIN skyblocks sb ON sp.grid_id = sb.grid_id
-		WHERE sp.player_id = ${body.player_id}
-	`);
-	let parsedPerm = {};
-	perms.forEach(e => {
-		parsedPerm[e.grid_id] = {
-			upgrade_level: e.upgrade_level,
-			break_perm: !!e.break_perm,
-			place_perm: !!e.place_perm,
-			chest_perm: !!e.chest_perm,
-			doors_perm: !!e.doors_perm,
-			other_perm: !!e.other_perm
-		}
-	});
-	res.json(parsedPerm);
-});
-
 app.post('/credit/save', ({ body }, res) => {
 	db.run(sql`
 		UPDATE players
@@ -67,6 +46,28 @@ app.post('/credit/saveall', ({ body }, res) => {
 		END
 		WHERE id IN (${ids})
 	`);
+});
+
+app.post('/player/perms', ({ body }, res) => {
+	const perms = db.all(sql`
+		SELECT sp.*, sb.upgrade_level, sb.owner_id
+		FROM skyblock_perms sp
+		JOIN skyblocks sb ON sp.grid_id = sb.grid_id
+		WHERE sp.player_id = ${body.player_id}
+	`);
+	let parsedPerm = {};
+	perms.forEach(e => {
+		parsedPerm[e.grid_id] = {
+			owner_id: e.owner_id,
+			upgrade_level: e.upgrade_level,
+			break_perm: !!e.break_perm,
+			place_perm: !!e.place_perm,
+			chest_perm: !!e.chest_perm,
+			doors_perm: !!e.doors_perm,
+			other_perm: !!e.other_perm
+		}
+	});
+	res.json(parsedPerm);
 });
 
 app.post('/player/new', ({body}, res) => {
@@ -100,6 +101,33 @@ app.post('/skyblock/retrieve', ({body}, res) => {
 	res.json(data);
 });
 
+app.post('/skyblock/perms/store', ({body}, res) => {
+	const changes = db.run(sql`
+		INSERT INTO skyblock_perms
+		VALUES (
+			${body.player_id},
+			${+body.grid_id},
+			${+body.break_perm},
+			${+body.place_perm},
+			${+body.chest_perm},
+			${+body.other_perm}
+		)
+	`).changes;
+	if (changes > 1) res.sendStatus(200);
+	else res.sendStatus(500);
+});
+
+app.post('/skyblock/ping', ({body}, res) => {
+	let data = db.get(sql`
+		SELECT 1 FROM skyblocks
+		WHERE grid_id = ${ body.grid_id }
+	`);
+	if (!data) {
+		res.json({ res: false })
+	} else {
+		res.json({ res: true })
+	}
+});
 
 app.get('/players', (req, res) => {
 	console.log("Retrieving player list from the database.");

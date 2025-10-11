@@ -47,7 +47,6 @@ db.execute(sql`
 		break_perm INTEGER DEFAULT 1,
 		place_perm INTEGER DEFAULT 1,
 		chest_perm INTEGER DEFAULT 1,
-		doors_perm INTEGER DEFAULT 1,
 		other_perm INTEGER DEFAULT 1, -- All interact events except chests and doors
 		PRIMARY KEY(player_id, grid_id),
 		FOREIGN KEY(grid_id) REFERENCES skyblocks(grid_id) ON UPDATE CASCADE
