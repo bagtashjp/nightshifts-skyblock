@@ -113,9 +113,33 @@ app.post('/skyblock/perms/store', ({body}, res) => {
 			${+body.other_perm}
 		)
 	`).changes;
-	if (changes > 1) res.sendStatus(200);
+	if (changes > 0) res.sendStatus(200);
 	else res.sendStatus(500);
 });
+
+app.post('/skyblock/perms/update', ({body}, res) => {
+	const changes = db.run(sql`
+		UPDATE skyblock_perms
+		SET break_perm = ${+body.break_perm},
+			place_perm = ${+body.place_perm},
+			chest_perm = ${+body.chest_perm},
+			other_perm = ${+body.other_perm}
+		WHERE player_id = ${body.player_id}
+			AND grid_id = ${+body.grid_id}
+	`).changes;
+	if (changes > 0) res.sendStatus(200)
+	else res.status(200).send("Unchanged")
+});
+
+app.delete('/skyblock/perms/delete', ({body}, res) => {
+	const changes = db.run(sql`
+		DELETE FROM skyblock_perms
+		WHERE player_id = ${body.player_id}
+			AND grid_id = ${+body.grid_id}
+	`).changes;
+	if (changes > 0) res.sendStatus(200)
+	else res.sendStatus(500)
+})
 
 app.post('/skyblock/ping', ({body}, res) => {
 	let data = db.get(sql`
