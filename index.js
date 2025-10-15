@@ -28,6 +28,28 @@ function authMiddleware(req, res, next) {
 }
 app.use(authMiddleware);
 
+const allowlistPath = path.join(process.cwd(), "allowlist.json");
+
+app.get("/whitelist", (req, res) => {
+  try {
+    const data = JSON.parse(fs.readFileSync(allowlistPath, "utf-8"));
+    const cleaned = data.map(({ name, xuid }) => ({ name, xuid }));
+    res.status(200).json(cleaned);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to read whitelist." });
+  }
+});
+
+app.post('/whitelist', ({ body }, res) => {
+	child.stdin.write(`whitelist add "${body.player_name}"\n`);
+});
+
+app.delete('/whitelist', ({ body }, res) => {
+	child.stdin.write(`whitelist remove "${body.player_name}"\n`);
+});
+
+
 app.post('/credit/save', ({ body }, res) => {
 	db.run(sql`
 		UPDATE players
@@ -89,7 +111,10 @@ app.post('/skyblock/new', ({body}, res) => {
 	else res.sendStatus(500);
 });
 
-app.post('/skyblock/retrieve', ({body}, res) => {
+app.get('/skyblock/retrieve', (req, res) => {
+	const {player_id} = req.query;
+	console.log(`Retrieving Skyblock data for player id: [${player_id}].`);
+	if (!player_id) return res.status(400).send("Missing player_id in query");
 	let data = db.get(sql`
 		SELECT * FROM skyblocks
 		WHERE owner_id = ${body.player_id}
@@ -132,6 +157,13 @@ app.post('/skyblock/perms/update', ({body}, res) => {
 });
 
 app.delete('/skyblock/perms/delete', ({body}, res) => {
+	console.log(body.player_id);
+	console.log(body.grid_id);
+	console.log(db.get(sql`
+		SELECT 1 FROM skyblock_perms
+			WHERE player_id = ${body.player_id}
+			AND grid_id = ${+body.grid_id}
+	`))
 	const changes = db.run(sql`
 		DELETE FROM skyblock_perms
 		WHERE player_id = ${body.player_id}
@@ -299,7 +331,7 @@ client.on(Events.MessageCreate, async data => {
 	}
 });
 
-//client.login(process.env.BOT_TOKEN);
+client.login(process.env.BOT_TOKEN);
 
 // Helpers
 function spiralNextXZ([x, z, incr = 0, step = 1, dir = 0]) {

@@ -30,7 +30,7 @@ db.execute(sql`
 	CREATE TABLE IF NOT EXISTS skyblocks (
 		id INTEGER PRIMARY KEY,
 		owner_id TEXT NOT NULL, 
-		grid_id INTEGER NOT NULL,
+		grid_id INTEGER NOT NULL UNIQUE,
 		upgrade_level INTEGER DEFAULT 1,
 		spawn_x INTEGER DEFAULT 0
 			-- For fanciness. Will still do server-side validations.
@@ -49,7 +49,7 @@ db.execute(sql`
 		chest_perm INTEGER DEFAULT 1,
 		other_perm INTEGER DEFAULT 1, -- All interact events except chests and doors
 		PRIMARY KEY(player_id, grid_id),
-		FOREIGN KEY(grid_id) REFERENCES skyblocks(grid_id) ON UPDATE CASCADE
+		FOREIGN KEY(grid_id) REFERENCES skyblocks(grid_id) ON UPDATE CASCADE,
 		FOREIGN KEY(player_id) REFERENCES players(id)
 	);
 	INSERT OR IGNORE INTO global_params(id)
